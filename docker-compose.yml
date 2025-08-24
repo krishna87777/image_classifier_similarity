@@ -1,0 +1,126 @@
+version: '3.8'
+
+services:
+  # Backend service - Production optimized
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ai-image-backend-prod
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+      - NODE_ENV=production
+      - LOG_LEVEL=info
+    volumes:
+      # Only mount data directories (not source code)
+      - ./backend/models:/app/models:ro
+      - ./backend/data:/app/data:ro
+      - backend_logs:/app/logs
+    networks:
+      - ai-image-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '1.0'
+        reservations:
+          memory: 1G
+          cpus: '0.5'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Frontend service - Production optimized
+  frontend:
+    build:
+      context: ./image-frontend
+      dockerfile: Dockerfile
+    container_name: ai-image-frontend-prod
+    ports:
+      - "80:80"    # Production typically uses port 80
+      - "3000:80"  # Alternative port for testing
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - ai-image-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  # Optional: Redis for caching (production enhancement)
+  redis:
+    image: redis:7-alpine
+    container_name: ai-image-redis-prod
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - ai-image-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.2'
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # Optional: Monitoring with Watchtower (auto-updates)
+  watchtower:
+    image: containrrr/watchtower
+    container_name: ai-image-watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_POLL_INTERVAL=86400  # Check daily
+      - WATCHTOWER_INCLUDE_STOPPED=true
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+# Networks
+networks:
+  ai-image-network:
+    driver: bridge
+    name: ai-image-prod-network
+
+# Persistent volumes
+volumes:
+  backend_logs:
+    name: ai-image-backend-logs
+  redis_data:
+    name: ai-image-redis-data
