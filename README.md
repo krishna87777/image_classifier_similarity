@@ -2,7 +2,7 @@
 
 A full-stack application for image classification and similarity search using FastAPI backend and React frontend, fully containerized with Docker.
 
-## 🏗️ Project Structure
+## 🏗Project Structure
 
 ```
 pythonProject/
