@@ -311,16 +311,6 @@ docker stack deploy -c docker-compose.prod.yml ai-image-app
 docker service scale ai-image-app_backend=3
 ```
 
-### Using Kubernetes
-
-```bash
-# Convert to Kubernetes manifests
-kompose convert -f docker-compose.prod.yml
-
-# Apply to cluster
-kubectl apply -f .
-```
-
 ## 🏷️ Version Info
 
 - **Docker**: >= 20.0
